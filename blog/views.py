@@ -1,6 +1,7 @@
 from django.db.models import Count
 from django.shortcuts import render
 from blog.models import Comment, Post, Tag
+from pprint import pprint
 
 
 def get_related_posts_count(tag):
@@ -28,26 +29,55 @@ def serialize_tag(tag):
     }
 
 
+def serialize_post_optimized(post):
+    return {
+        'title': post.title,
+        'teaser_text': post.text[:200],
+        'author': post.author.username,
+        'comments_amount': post.comments_amount,
+        'image_url': post.image.url if post.image else None,
+        'published_at': post.published_at,
+        'slug': post.slug,
+        'tags': [serialize_tag(tag) for tag in post.tags.all()],
+        'first_tag_title': post.tags.all()[0].title,
+    }
+
+
 def index(request):
-    popular_posts = Post.objects.annotate(
-            num_likes=Count('likes')
-        ).order_by('num_likes').prefetch_related('author')
-    most_popular_posts = list(popular_posts)[-5:]
+    most_popular_posts = Post.objects.annotate(
+            likes_count=Count('likes')
+        ).order_by('-likes_count').prefetch_related('author')[:5]
 
-    fresh_posts = Post.objects.order_by('published_at').prefetch_related('author')
-    most_fresh_posts = list(fresh_posts)[-5:]
+    most_popular_posts_ids = [post.id for post in most_popular_posts]
+    posts_with_comments = Post.objects.filter(
+            id__in=most_popular_posts_ids
+        ).annotate(
+            comments_amount=Count('comments')
+        )
+    ids_and_comments = posts_with_comments.values_list('id', 'comments_amount')
+    count_for_id = dict(ids_and_comments)
 
-    popular_tags = Tag.objects.annotate(
-            count_posts=Count('posts')
-        ).order_by('count_posts')
-    most_popular_tags = list(popular_tags)[-5:]
+    for post in most_popular_posts:
+        post.comments_amount = count_for_id[post.id]
+
+    most_fresh_posts = Post.objects.annotate(
+            comments_amount=Count('comments'),
+        ).order_by('-published_at').prefetch_related('author')[:5]
+
+    most_popular_tags = Tag.objects.annotate(
+            posts_count=Count('posts')
+        ).order_by('-posts_count')[:5]
 
     context = {
         'most_popular_posts': [
-            serialize_post(post) for post in most_popular_posts
+            serialize_post_optimized(post) for post in most_popular_posts
         ],
-        'page_posts': [serialize_post(post) for post in most_fresh_posts],
-        'popular_tags': [serialize_tag(tag) for tag in most_popular_tags],
+        'page_posts': [
+            serialize_post_optimized(post) for post in most_fresh_posts
+        ],
+        'popular_tags': [
+            serialize_tag(tag) for tag in most_popular_tags
+        ],
     }
     return render(request, 'index.html', context)
 
@@ -121,3 +151,4 @@ def contacts(request):
     # позже здесь будет код для статистики заходов на эту страницу
     # и для записи фидбека
     return render(request, 'contacts.html', {})
+
