@@ -54,7 +54,9 @@ def index(request):
 
 
 def post_detail(request, slug):
-    queryset = Post.objects.annotate(likes_amount=Count('likes'))
+    queryset = Post.objects\
+                        .annotate(likes_amount=Count('likes'))\
+                        .prefetch_related('author')
     post = get_object_or_404(queryset, slug=slug)
     comments = post.comments.prefetch_related('author')
     serialized_comments = []
@@ -64,7 +66,6 @@ def post_detail(request, slug):
             'published_at': comment.published_at,
             'author': comment.author.username,
         })
-
     related_tags = post.tags.annotate(posts_count=Count('posts'))
     serialized_post = {
         'title': post.title,
