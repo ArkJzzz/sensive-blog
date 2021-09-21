@@ -28,17 +28,16 @@ def serialize_tag(tag):
 
 
 def index(request):
-    prefetch = Post.objects.prefetch_tag_posts_count()
     most_popular_posts = Post.objects\
                                 .popular()\
                                 .prefetch_related('author')[:5]\
-                                .prefetch_related(prefetch)\
+                                .prefetch_tag_posts_count()\
                                 .fetch_with_comments_count()
 
     most_fresh_posts = Post.objects\
                                 .fresh()\
                                 .prefetch_related('author')[:5]\
-                                .prefetch_related(prefetch)
+                                .prefetch_tag_posts_count()
     most_popular_tags = Tag.objects.popular()[:5]
     context = {
         'most_popular_posts': [
@@ -79,11 +78,10 @@ def post_detail(request, slug):
         'tags': [serialize_tag(tag) for tag in related_tags],
     }
     most_popular_tags = Tag.objects.popular()[:5]
-    prefetch = Post.objects.prefetch_tag_posts_count()
     most_popular_posts = Post.objects\
                                 .popular()\
                                 .prefetch_related('author')[:5]\
-                                .prefetch_related(prefetch)\
+                                .prefetch_tag_posts_count()\
                                 .fetch_with_comments_count()
     context = {
         'post': serialized_post,
@@ -96,18 +94,17 @@ def post_detail(request, slug):
 
 
 def tag_filter(request, tag_title):
-    prefetch = Post.objects.prefetch_tag_posts_count()
     tag = get_object_or_404(Tag, title=tag_title)
     most_popular_tags = Tag.objects.popular()[:5]
     most_popular_posts = Post.objects\
                                 .popular()\
                                 .prefetch_related('author')[:5]\
-                                .prefetch_related(prefetch)\
+                                .prefetch_tag_posts_count()\
                                 .fetch_with_comments_count()
     related_posts = tag.posts\
                             .all()\
                             .prefetch_related('author')[:20]\
-                            .prefetch_related(prefetch)\
+                            .prefetch_tag_posts_count()\
                             .fetch_with_comments_count()
     context = {
         'tag': tag.title,
